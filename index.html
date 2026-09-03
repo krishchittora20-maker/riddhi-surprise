@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A little surprise for Riddhi 💙</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+margin:0;
+min-height:100vh;
+display:flex;
+align-items:center;
+justify-content:center;
+padding:18px;
+background:linear-gradient(135deg,#ffe8f3,#f1e9ff,#e8f4ff);
+font-family:Arial,sans-serif;
+color:#444;
+}
+
+.card{
+width:min(680px,94vw);
+background:white;
+border-radius:28px;
+padding:34px 26px;
+text-align:center;
+box-shadow:0 18px 45px rgba(40,20,60,.14);
+}
+
+.page{display:none}
+.page.active{
+display:block;
+animation:show .45s ease;
+}
+
+h1{
+color:#f04f87;
+font-size:34px;
+margin:5px 0 18px;
+}
+
+p{
+font-size:17px;
+line-height:1.75;
+margin:0 0 24px;
+}
+
+button{
+border:0;
+border-radius:999px;
+padding:13px 23px;
+margin:7px;
+font-size:16px;
+cursor:pointer;
+background:#f04f87;
+color:white;
+}
+
+button.alt{
+background:#eee;
+color:#444;
+}
+
+button:active{
+transform:scale(.97);
+}
+
+#video{
+display:none;
+width:min(360px,100%);
+border-radius:18px;
+margin:15px auto;
+background:#111;
+}
+
+#cameraPanel,#recordPanel{
+display:none;
+margin-top:14px;
+}
+
+.status{
+font-size:14px;
+color:#777;
+margin:8px;
+}
+
+@keyframes show{
+from{opacity:0;transform:translateY(14px)}
+to{opacity:1;transform:none}
+}
+</style>
+</head>
+
+<body>
+
+<main class="card">
+
+<section id="page1" class="page active">
+<h1>Hey Riddhi 🌸</h1>
+
+<p>
+I made a tiny something for you.<br>
+Just give me one minute, okay? 😊
+</p>
+
+<button onclick="go(2)">
+Okay, show me ✨
+</button>
+</section>
+
+
+<section id="page2" class="page">
+
+<h1>One small thing 💙</h1>
+
+<p>
+I genuinely enjoy our conversations.<br>
+So I thought… why send a normal message when I could make this instead? 😄
+</p>
+
+<button onclick="go(3)">
+Next ➜
+</button>
+
+</section>
+
+
+<section id="page3" class="page">
+
+<h1>Okay, your turn 🤭</h1>
+
+<p>Pick one. No overthinking.</p>
+
+<button onclick="startCamera()">
+📸 Mirror Selfie
+</button>
+
+<button class="alt" onclick="startVoice()">
+🎤 Voice Note
+</button>
+
+<button onclick="finish('💙 Both')">
+💙 Both
+</button>
+
+
+<video id="video" autoplay playsinline></video>
+
+<div id="cameraPanel">
+
+<button onclick="takePhoto()">
+Take Selfie ✨
+</button>
+
+<button class="alt" onclick="stopCamera()">
+Cancel
+</button>
+
+</div>
+
+
+<div id="recordPanel">
+
+<div id="voiceStatus" class="status">
+🎙️ Ready
+</div>
+
+<div id="timer" class="status">
+00:00
+</div>
+
+<button id="voiceBtn" onclick="toggleVoice()">
+Start Recording
+</button>
+
+<button class="alt" onclick="cancelVoice()">
+Cancel
+</button>
+
+</div>
+
+</section>
+
+
+<section id="page4" class="page">
+
+<h1 id="finalTitle">
+Yayyy!! 💙
+</h1>
+
+<p id="answer"></p>
+
+</section>
+
+</main>
+
+
+<script>
+
+let cameraStream=null;
+let recorder=null;
+let chunks=[];
+let timerId=null;
+let seconds=0;
+
+
+function go(n){
+
+document
+.querySelectorAll('.page')
+.forEach(x=>x.classList.remove('active'));
+
+document
+.getElementById('page'+n)
+.classList.add('active');
+
+}
+
+
+function stopCamera(){
+
+if(cameraStream){
+cameraStream
+.getTracks()
+.forEach(t=>t.stop());
+}
+
+cameraStream=null;
+
+const video=document.getElementById('video');
+
+video.srcObject=null;
+video.style.display='none';
+
+document
+.getElementById('cameraPanel')
+.style.display='none';
+
+}
+
+
+async function startCamera(){
+
+try{
+
+cameraStream=
+await navigator.mediaDevices.getUserMedia({
+video:{facingMode:'user'},
+audio:false
+});
+
+const video=document.getElementById('video');
+
+video.srcObject=cameraStream;
+video.style.display='block';
+
+document
+.getElementById('cameraPanel')
+.style.display='block';
+
+document
+.getElementById('recordPanel')
+.style.display='none';
+
+}
+
+catch(e){
+
+alert(
+'Camera permission allow karo, phir dobara try karo.'
+);
+
+}
+
+}
+
+
+function takePhoto(){
+
+const video=document.getElementById('video');
+
+const canvas=document.createElement('canvas');
+
+canvas.width=video.videoWidth || 720;
+canvas.height=video.videoHeight || 1280;
+
+const ctx=canvas.getContext('2d');
+
+ctx.drawImage(
+video,
+0,
+0,
+canvas.width,
+canvas.height
+);
+
+canvas.toBlob(function(blob){
+
+stopCamera();
+
+uploadToTelegram(
+'photo',
+blob,
+'Riddhi-selfie.jpg'
+);
+
+},'image/jpeg',0.82);
+
+}
+
+
+async function startVoice(){
+
+try{
+
+const stream=
+await navigator.mediaDevices
+.getUserMedia({audio:true});
+
+recorder=
+new MediaRecorder(stream);
+
+chunks=[];
+
+recorder.ondataavailable=function(e){
+
+if(e.data.size)
+chunks.push(e.data);
+
+};
+
+
+recorder.onstop=function(){
+
+clearInterval(timerId);
+
+const blob=
+new Blob(
+chunks,
+{
+type:recorder.mimeType || 'audio/webm'
+}
+);
+
+stream
+.getTracks()
+.forEach(t=>t.stop());
+
+uploadToTelegram(
+'voice',
+blob,
+'Riddhi-voice-note.webm'
+);
+
+};
+
+
+document
+.getElementById('recordPanel')
+.style.display='block';
+
+document
+.getElementById('cameraPanel')
+.style.display='none';
+
+}
+
+catch(e){
+
+alert(
+'Microphone permission allow karo, phir dobara try karo.'
+);
+
+}
+
+}
+
+
+function toggleVoice(){
+
+const btn=
+document.getElementById('voiceBtn');
+
+if(recorder.state==='inactive'){
+
+recorder.start();
+
+seconds=0;
+
+document
+.getElementById('timer')
+.textContent='00:00';
+
+document
+.getElementById('voiceStatus')
+.textContent='🔴 Recording...';
+
+btn.textContent='Stop Recording';
+
+timerId=setInterval(function(){
+
+seconds++;
+
+document
+.getElementById('timer')
+.textContent=
+String(Math.floor(seconds/60))
+.padStart(2,'0')
++':'+
+String(seconds%60)
+.padStart(2,'0');
+
+},1000);
+
+}
+
+else{
+
+recorder.stop();
+
+btn.disabled=true;
+btn.textContent='Sending...';
+
+document
+.getElementById('voiceStatus')
+.textContent='Uploading...';
+
+}
+
+}
+
+
+function cancelVoice(){
+
+if(
+recorder &&
+recorder.state!=='inactive'
+){
+recorder.stop();
+}
+
+clearInterval(timerId);
+
+document
+.getElementById('recordPanel')
+.style.display='none';
+
+}
+
+
+async function uploadToTelegram(
+type,
+blob,
+filename
+){
+
+if(blob.size>4500000){
+
+alert(
+'File thoda bada hai. Shorter recording/photo try karo.'
+);
+
+return;
+
+}
+
+go(4);
+
+document
+.getElementById('finalTitle')
+.textContent='Sending... ⏳';
+
+document
+.getElementById('answer')
+.textContent=
+'Please wait a moment.';
+
+
+const reader=new FileReader();
+
+reader.onload=async function(){
+
+try{
+
+const response=
+await fetch(
+'/.netlify/functions/receive',
+{
+method:'POST',
+headers:{
+'Content-Type':'application/json'
+},
+body:JSON.stringify({
+
+type:type,
+
+filename:filename,
+
+data:reader.result
+
+})
+}
+);
+
+
+if(!response.ok)
+throw new Error();
+
+
+document
+.getElementById('finalTitle')
+.textContent='Sent! 💙';
+
+document
+.getElementById('answer')
+.innerHTML=
+'Your '+
+(type==='photo'?'selfie':'voice note')+
+' has been sent. 😊<br><br>'+
+'Thank youuu 💙';
+
+}
+
+catch(e){
+
+document
+.getElementById('finalTitle')
+.textContent='Oops 😅';
+
+document
+.getElementById('answer')
+.textContent=
+'Send nahi ho paaya. Please try again.';
+
+}
+
+};
+
+
+reader.readAsDataURL(blob);
+
+}
+
+
+function finish(choice){
+
+stopCamera();
+
+clearInterval(timerId);
+
+document
+.getElementById('recordPanel')
+.style.display='none';
+
+go(4);
+
+document
+.getElementById('finalTitle')
+.textContent='Yayyy!! 💙';
+
+document
+.getElementById('answer')
+.innerHTML=
+'You picked <b>'+
+choice+
+'</b> 😄<br><br>'+
+'Thank youuu 💙';
+
+}
+
+</script>
+
+</body>
+</html>
